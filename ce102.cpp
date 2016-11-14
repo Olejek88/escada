@@ -4,19 +4,18 @@
 #include "main.h"
 #include "ce102.h"
 #include "db.h"
-#include "func.h"
 #include <fcntl.h>
 //-----------------------------------------------------------------------------
 static  MYSQL_RES *res;
 static  db      dbase;
 static  MYSQL_ROW row;
-static  CHAR    query[500];     
 
+static  CHAR    query[500];     
 static  INT     fd;
 static  termios tio;
 
 extern  "C" UINT device_num;    // total device quant
-extern  "C" UINT dev_num[30];  	// total device quant
+extern  "C" UINT ce_num;     	// total device quant
 extern  "C" BOOL WorkRegim;     // work regim flag
 extern  "C" tm *currenttime;    // current system time
 
@@ -39,8 +38,8 @@ static  BYTE CRC(const BYTE* const Data, const BYTE DataSize, BYTE type);
 static  BOOL    OpenCom (SHORT blok, UINT speed);       // open com function
         VOID    Events (DWORD evnt, DWORD device);      // events 
 static  BOOL    LoadCEConfig();                      // load tekon configuration
-//static  BOOL    StoreData (UINT dv, UINT prm, UINT pipe, UINT status, FLOAT value);             // store data to DB
-//static  BOOL    StoreData (UINT dv, UINT prm, UINT pipe, UINT type, FLOAT value, CHAR* data);
+static  BOOL    StoreData (UINT dv, UINT prm, UINT pipe, UINT status, FLOAT value);             // store data to DB
+static  BOOL    StoreData (UINT dv, UINT prm, UINT pipe, UINT type, FLOAT value, CHAR* data);
 //-----------------------------------------------------------------------------
 
 void * ceDeviceThread (void * devr)
@@ -55,25 +54,25 @@ void * ceDeviceThread (void * devr)
  if (!rs) return (0);
 
  while (WorkRegim)
- for (UINT d=0;d<dev_num[TYPE_INPUTCE];d++)
+ for (UINT d=0;d<ce_num;d++)
     {
      if (debug>1) ULOGW ("[ce] ReadDataCurrent (%d)",d);
      ce[d].ReadDataCurrent (); 
      if (debug>1) ULOGW ("[ce] ReadDataArchive (%d)",d);
      ce[d].ReadAllArchive (10);
-     if (!dk.pth[TYPE_INPUTCE])
+     if (!dk.pth_ce)
         {
 	 if (debug>0) ULOGW ("[ce] ce thread stopped");
 	 //dbase.sqldisconn();
 	 //pthread_exit ();	 
-	 ce_thread=false;
+	 ce_thread=FALSE;
 	 pthread_exit (NULL);
 	 return 0;	 
 	}          
     }
  dbase.sqldisconn();
  if (debug>0) ULOGW ("[ce] CE102 thread end");
- ce_thread=false;
+ ce_thread=FALSE;
  pthread_exit (NULL); 
 }
 //-----------------------------------------------------------------------------
@@ -92,7 +91,7 @@ int DeviceCE::ReadDataCurrent ()
     {
      fl=((float)data[0]+(float)data[1]*256+(float)data[2]*256*256)/100;
      if (debug>2) ULOGW ("[ce][0x%x 0x%x 0x%x] [%f]",data[0],data[1],data[2],fl);
-     StoreData (dbase, this->device, 14, 0, 0, fl, 0);
+     StoreData (this->device, 14, 0, 0, fl);
     } 
 
  rs=send_ce (NAK_W, 0, 0, 1);
@@ -101,7 +100,7 @@ int DeviceCE::ReadDataCurrent ()
     {
      fl=((float)data[0]+(float)data[1]*256+(float)data[2]*256*256)/100;
      if (debug>2) ULOGW ("[ce][0x%x 0x%x 0x%x 0x%x] [%f]",data[0],data[1],data[2],data[3],fl);
-     StoreData (dbase, this->device, 2, 0, 0, fl, 0);
+     StoreData (this->device, 2, 0, 0, fl);
     } 
  rs=send_ce (NAK_W1, 0, 1, 2);
  if (rs)  rs = this->read_ce(data, 0);
@@ -109,7 +108,7 @@ int DeviceCE::ReadDataCurrent ()
     {
      fl=((float)data[0]+(float)data[1]*256+(float)data[2]*256*256)/100;
      if (debug>2) ULOGW ("[ce][0x%x 0x%x 0x%x 0x%x] [%f]",data[0],data[1],data[2],data[3],fl);
-     StoreData (dbase, this->device, 2, 1, 0, fl, 0);
+     StoreData (this->device, 2, 1, 0, fl);
     } 
  rs=send_ce (NAK_W2, 1, 1, 2);
  if (rs)  rs = this->read_ce(data, 0);
@@ -117,7 +116,7 @@ int DeviceCE::ReadDataCurrent ()
     {
      fl=((float)data[0]+(float)data[1]*256+(float)data[2]*256*256)/100;
      if (debug>2) ULOGW ("[ce][0x%x 0x%x 0x%x 0x%x] [%f]",data[0],data[1],data[2],data[3],fl);
-     StoreData (dbase, this->device, 2, 2, 0, fl, 0);
+     StoreData (this->device, 2, 2, 0, fl);
     } 
  return 0;
 }
@@ -143,7 +142,7 @@ int DeviceCE::ReadAllArchive (UINT tp)
      fl=((float)data[0]+(float)data[1]*256+(float)data[2]*256*256+(float)data[3]*256*256*256)/100;
      if (debug>2) ULOGW ("[ce][0x%x 0x%x 0x%x 0x%x] [%f]",data[0],data[1],data[2],data[3],fl);
      sprintf (this->lastdate,"%04d%02d%02d%02d0000",currenttime->tm_year+1900,currenttime->tm_mon+1,currenttime->tm_mday,currenttime->tm_hour);
-     StoreData (dbase, this->device, 2, 0, 1, 0, fl, this->lastdate, 0);
+     StoreData (this->device, 2, 0, 1, fl, this->lastdate);
     } 
  rs=send_ce (NAK_W1, 0, 1, 2);
  if (rs)  rs = this->read_ce(data, 0);
@@ -152,7 +151,7 @@ int DeviceCE::ReadAllArchive (UINT tp)
      fl=((float)data[0]+(float)data[1]*256+(float)data[2]*256*256+(float)data[3]*256*256*256)/100;
      if (debug>2) ULOGW ("[ce][0x%x 0x%x 0x%x 0x%x] [%f]",data[0],data[1],data[2],data[3],fl);
      sprintf (this->lastdate,"%04d%02d%02d%02d0000",currenttime->tm_year+1900,currenttime->tm_mon+1,currenttime->tm_mday,currenttime->tm_hour);
-     StoreData (dbase, this->device, 2, 1, 1, 0, fl, this->lastdate, 0);
+     StoreData (this->device, 2, 1, 1, fl, this->lastdate);
     } 
  rs=send_ce (NAK_W2, 1, 1, 2);
  if (rs)  rs = this->read_ce(data, 0);
@@ -161,7 +160,7 @@ int DeviceCE::ReadAllArchive (UINT tp)
      fl=((float)data[0]+(float)data[1]*256+(float)data[2]*256*256+(float)data[3]*256*256*256)/100;
      if (debug>2) ULOGW ("[ce][0x%x 0x%x 0x%x 0x%x] [%f]",data[0],data[1],data[2],data[3],fl);
      sprintf (this->lastdate,"%04d%02d%02d%02d0000",currenttime->tm_year+1900,currenttime->tm_mon+1,currenttime->tm_mday,currenttime->tm_hour);
-     StoreData (dbase, this->device, 2, 2, 1, 0, fl, this->lastdate, 0);
+     StoreData (this->device, 2, 2, 1, fl, this->lastdate);
     } 
  for (int i=0; i<tp; i++)
     {
@@ -178,7 +177,7 @@ int DeviceCE::ReadAllArchive (UINT tp)
          struct tm tt;
          localtime_r(&tim,&tt);
          sprintf (this->lastdate,"%04d%02d%02d%02d0000",tt.tm_year+1900,tt.tm_mon+1,tt.tm_mday,tt.tm_hour);     
-         if (fl>0) StoreData (dbase, this->device, 14, 0, 1, 0, fl, this->lastdate, 0);
+         if (fl>0) StoreData (this->device, 14, 0, 1, fl, this->lastdate);
 	} 
     }
  return 0;
@@ -187,7 +186,7 @@ int DeviceCE::ReadAllArchive (UINT tp)
 // load all km configuration from DB
 BOOL LoadCEConfig()
 {
- UINT ce_num=dev_num[TYPE_INPUTCE];
+ ce_num=0;
  for (UINT d=0;d<device_num;d++)
  if (dev[d].type==TYPE_INPUTCE)
     {
@@ -229,6 +228,48 @@ BOOL LoadCEConfig()
  if (res) mysql_free_result(res);
 }
 //---------------------------------------------------------------------------------------------------
+BOOL StoreData (UINT dv, UINT prm, UINT pipe, UINT status, FLOAT value)
+{
+ sprintf (query,"SELECT * FROM prdata WHERE type=0 AND prm=%d AND device=%d AND pipe=%d",prm,dv,pipe);
+ res=dbase.sqlexec(query);
+ if (row=mysql_fetch_row(res)) sprintf (query,"UPDATE prdata SET value=%f,status=%d WHERE type=0 AND prm=%d AND device=%d AND pipe=%d",value,status,prm,dv,pipe);
+ else 
+    {
+     sprintf (query,"INSERT INTO prdata(device,prm,type,value,status,pipe) VALUES('%d','%d','0','%f','%d','%d')",dv,prm,value,status,pipe);
+    }
+ if (debug>2) ULOGW("[ce] %s",query);
+ if (res) mysql_free_result(res);  
+ res=dbase.sqlexec(query);
+ if (res) mysql_free_result(res);  
+ return true;
+}
+//---------------------------------------------------------------------------------------------------
+BOOL StoreData (UINT dv, UINT prm, UINT pipe, UINT type, FLOAT value, CHAR* data)
+{
+ sprintf (query,"SELECT * FROM prdata WHERE device=%d AND type=%d AND prm=%d AND pipe=%d AND date=%s",dv,type,prm,pipe,data);
+ res=dbase.sqlexec(query);
+ if (debug>2) ULOGW("[ce] %s",query);
+ if (row=mysql_fetch_row(res))
+    {
+     sprintf (query,"UPDATE prdata SET value=%f,date=date WHERE pipe='%d' AND type='%d' AND prm=%d AND date='%s' AND device=%d",value,pipe,type,prm,data,dv);
+     if (atof(row[3])==0 && value>0)
+    	{
+	 if (debug>2) ULOGW("[ce] %s",query);
+	 res=dbase.sqlexec(query);
+	}
+     if (res) mysql_free_result(res);
+     return true;     
+    }
+ else sprintf (query,"INSERT INTO prdata(device,prm,type,value,status,date,pipe) VALUES('%d','%d','%d','%f','%d','%s','%d')",dv,prm,type,value,0,data,pipe);
+ if (debug>2) ULOGW("[ce] %s",query);
+
+ if (res) mysql_free_result(res);
+ res=dbase.sqlexec(query); 
+ if (res) mysql_free_result(res);
+ return true;
+}
+
+//---------------------------------------------------------------------------------------------------
 BOOL OpenCom (SHORT blok, UINT speed)
 {
  CHAR devp[50];
@@ -239,7 +280,7 @@ BOOL OpenCom (SHORT blok, UINT speed)
  if (fd<0) 
     {
      if (debug>0) ULOGW("[ce] error open com-port %s [%s]",devp,strerror(errno)); 
-     return false;
+     return FALSE;
     }
  else if (debug>1) ULOGW("[ce] open com-port success"); 
 
@@ -268,7 +309,8 @@ BOOL OpenCom (SHORT blok, UINT speed)
  fcntl(fd, F_SETFL, 0);
  tcsetattr(fd, TCSANOW, &tio);
  tcsetattr (fd,TCSAFLUSH,&tio);
- return true;
+ 
+ return TRUE;
 }
 
 //rs=send_ce (CUR_REQUEST, this->addr[sens_num], this->addr[sens_num], 0);
