@@ -1,0 +1,14 @@
+#!/bin/sh
+#
+### BEGIN INIT INFO
+# Provides: rc.local
+# X-Mandriva-Compat-Mode
+# Default-Start: 2 3 4 5
+# Short-Description: Local initialization script
+# Description: This script will be executed *after* all the other init scripts.
+#              You can put your own initialization stuff in here if you don't
+#              want to do the full Sys V style init stuff.
+### END INIT INFO
+
+touch /var/lock/subsys/local
+/home/user/dk/start
