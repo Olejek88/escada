@@ -57,7 +57,7 @@ extern "C" {
 #define MAX_MESSAGE_LENGTH     256
 
 #define MAX_STATUS             800
-#define MAX_REGISTERS          100
+#define MAX_REGISTERS          120
 
 #define REPORT_SLAVE_ID_LENGTH 75
 
