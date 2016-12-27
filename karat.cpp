@@ -71,11 +71,11 @@ void * karatDeviceThread (void * devr)
      for (UINT r=0;r<karat_num;r++)
         {
          if (debug>3) ULOGW ("[307] Karat[%d/%d].ReadLastArchive ()",r,karat_num);
-	 //karat[r].ReadData (CURRENT_ARCHIVE,1);
-	 //karat[r].ReadData (INT_ARCHIVE,100);
+	 karat[r].ReadData (CURRENT_ARCHIVE,1);
+	 //karat[r].ReadData (INT_ARCHIVE,1);
 	 karat[r].ReadData (HOUR_ARCHIVE,5);
-	 //karat[r].ReadData (DAY_ARCHIVE,90);
-	 //if (currenttime->tm_mday<15)	Karat[r].ReadData (MONTH_ARCHIVE,2);
+	 karat[r].ReadData (DAY_ARCHIVE,9);
+	 if (currenttime->tm_mday<15) karat[r].ReadData (MONTH_ARCHIVE,2);
 	 sleep (1);
 	}
      sleep (1);
@@ -183,6 +183,7 @@ int DeviceKarat::ReadData (UINT	type, UINT deep)
  time(&tim);
  if (type==HOUR_ARCHIVE) tim-=3600*2;
  if (type==DAY_ARCHIVE) tim-=3600*24;
+ if (type==MONTH_ARCHIVE) tim-=3600*24*28;
 // currenttime2=localtime(&tim);
 // localtime_r(&tim,currenttime2);
 
@@ -197,28 +198,31 @@ int DeviceKarat::ReadData (UINT	type, UINT deep)
 	 localtime_r(&tim,currenttime2);
 	 data_in[3]=currenttime2->tm_mon+1; data_in[2]=(currenttime2->tm_year-100);
 	 hour=currenttime2->tm_hour;
-	 if (type==DAY_ARCHIVE || type==INT_ARCHIVE) hour=0;
+	 if (type==DAY_ARCHIVE || type==INT_ARCHIVE || type==MONTH_ARCHIVE) hour=0;
 	 data_in[1]=hour; data_in[0]=(currenttime2->tm_mday);
 
          ULOGW ("[307] request(%d) [%d] [%02d-%02d-%02d %02d:00:00] [%x]",deep,type,currenttime2->tm_mday,currenttime2->tm_mon+1,currenttime2->tm_year-100,hour);
 	 if (type==HOUR_ARCHIVE) tim=tim-3600;
 	 if (type==DAY_ARCHIVE) tim-=3600*24;
-	 if (type==INT_ARCHIVE) tim-=3600*24;
+	 if (type==MONTH_ARCHIVE) tim-=3600*24*28;
         }
      rs=3;
      while (rs)
         {
 	 if (type>0) result = preset_multiple_registers(&mb_param, this->adr, REQUEST_DATA, 2, (uint16_t *)data_in);
          if (result>=0) break;
+	 else ULOGW ("[karat] res=%d",result);
          rs--;
         }
      sleep (1);
      rs=3;
+     //ULOGW ("[karat] read");
      while (rs)
         {
 	 if (type==HOUR_ARCHIVE) result = read_holding_registers(&mb_param, this->adr, ADR_HOUR, 120, (uint16_t *)data);
 	 if (type==DAY_ARCHIVE) result = read_holding_registers(&mb_param, this->adr, ADR_DAY, 120, (uint16_t *)data);
-	 if (type==INT_ARCHIVE) result = read_holding_registers(&mb_param, this->adr, ADR_INT, 120, (uint16_t *)data);
+	 if (type==MONTH_ARCHIVE) result = read_holding_registers(&mb_param, this->adr, ADR_MONTH, 120, (uint16_t *)data);
+	 if (type==INT_ARCHIVE) result = read_holding_registers(&mb_param, this->adr, 0x1314, 2, (uint16_t *)data);
 	 if (type==CURRENT_ARCHIVE)  result = read_holding_registers(&mb_param, this->adr, ADR_DATA_CURRENT, 110, (uint16_t *)data);
          if (result>=0) break;
          rs--;
@@ -234,35 +238,37 @@ int DeviceKarat::ReadData (UINT	type, UINT deep)
         }
      else
 	{
+	 if (type==INT_ARCHIVE) {
+  		 sprintf (date,"%04d%02d%02d000000",data[16]+2000,data[17],data[14]);
+		 data_in[0]=data[1]; data_in[1]=data[0]; data_in[2]=data[3]; data_in[3]=data[2];
+	         qp=*(float*)(data_in);
+		 StoreData (dbase,this->device, 13, 5, 0, qp, 0);
+		 free (currenttime2);
+		 return 0;
+	    }
+	 else
 	 if (type==CURRENT_ARCHIVE) sm=0;
 	 else sm=18;
-    	 data_in[0]=data[1+sm]; data_in[1]=data[0+sm]; data_in[2]=data[3+sm]; data_in[3]=data[2+sm];
-         t1=*(float*)(data_in);
-	 data_in[0]=data[5+sm]; data_in[1]=data[4+sm]; data_in[2]=data[7+sm]; data_in[3]=data[6+sm];
-	 t2=*(float*)(data_in);
-	 data_in[0]=data[13+sm]; data_in[1]=data[12+sm]; data_in[2]=data[15+sm]; data_in[3]=data[14+sm];
-	 p1=*(float*)(data_in);
-	 data_in[0]=data[17+sm]; data_in[1]=data[16+sm]; data_in[2]=data[19+sm]; data_in[3]=data[18+sm];
-         p2=*(float*)(data_in);
-	 data_in[0]=data[21+sm]; data_in[1]=data[20+sm]; data_in[2]=data[23+sm]; data_in[3]=data[22+sm];
-	 v1=*(float*)(data_in);
-	 data_in[0]=data[25+sm]; data_in[1]=data[24+sm]; data_in[2]=data[27+sm]; data_in[3]=data[26+sm];
-         v2=*(float*)(data_in);
-
+ data_in[0]=data[1+sm]; data_in[1]=data[0+sm]; data_in[2]=data[3+sm]; data_in[3]=data[2+sm];
+ t1=*(float*)(data_in);
+ data_in[0]=data[5+sm]; data_in[1]=data[4+sm]; data_in[2]=data[7+sm]; data_in[3]=data[6+sm];
+ t2=*(float*)(data_in);
+ data_in[0]=data[13+sm]; data_in[1]=data[12+sm]; data_in[2]=data[15+sm]; data_in[3]=data[14+sm];
+ v1=*(float*)(data_in);
+ data_in[0]=data[17+sm]; data_in[1]=data[16+sm]; data_in[2]=data[19+sm]; data_in[3]=data[18+sm];
+ v2=*(float*)(data_in);
+ data_in[0]=data[29+sm]; data_in[1]=data[28+sm]; data_in[2]=data[31+sm]; data_in[3]=data[30+sm];
+ p2=*(float*)(data_in);
+ data_in[0]=data[25+sm]; data_in[1]=data[24+sm]; data_in[2]=data[27+sm]; data_in[3]=data[26+sm];
+ p1=*(float*)(data_in);
 	 data_in[0]=data[33+sm]; data_in[1]=data[32+sm]; data_in[2]=data[35+sm]; data_in[3]=data[34+sm];
-	 q1=*(float*)(data_in);
-	 data_in[0]=data[37+sm]; data_in[1]=data[36+sm]; data_in[2]=data[39+sm]; data_in[3]=data[38+sm];
-         q2=*(float*)(data_in);
-	 data_in[0]=data[45+sm]; data_in[1]=data[44+sm]; data_in[2]=data[47+sm]; data_in[3]=data[46+sm];
-         qp=*(float*)(data_in);
+	 qp=*(float*)(data_in);
 
-	 //for (rs=0;rs<70;rs++) ULOGW("[%d]=%x",rs,data[rs]);
-	 // 11-26 13:48:47 [14]=1a  25
-	 // 11-26 13:48:47 [15]=9   9
-	 // 11-26 13:48:47 [16]=10  16 
-	 // 11-26 13:48:47 [17]=b   11
-         if (type==CURRENT_ARCHIVE || type==INT_ARCHIVE) if (debug>2) ULOGW ("[307] q1=%f, q2=%f, qp=%f, t1=%f, t2=%f, p1=%f, p2=%f, v1=%f, v2=%f",q1,q2,qp,t1,t2,p1,p2,v1,v2);
-         if (type>CURRENT_ARCHIVE && type<INT_ARCHIVE) if (debug>2) ULOGW ("[307][%d] [%02d-%02d-%02d %02d:00:00] q=%f, t1=%f, t2=%f, v1=%f, v2=%f %f",type,data[14],data[17],data[16],data[15],qp,t1,t2,v1,v2,v3);
+	 data_in[0]=data[42+sm]; data_in[1]=data[43+sm]; data_in[2]=data[44+sm]; data_in[3]=data[45+sm];
+	 v3=*(float*)(data_in);
+
+         if (type==CURRENT_ARCHIVE) if (debug>2) ULOGW ("[307] qp=%f, t1=%f, t2=%f, p1=%f, p2=%f, v1=%f, v2=%f, v3=%f, q1=%f, q2=%f",qp,t1,t2,p1,p2,v1,v2,v3,q1,q2);
+         if (type>CURRENT_ARCHIVE && type<INT_ARCHIVE) if (debug>2) ULOGW ("[307][%d] [%02d-%02d-%02d %02d:00:00] q=%f, t1=%f, t2=%f, v1=%f, v2=%f, v3=%f",type,data[14],data[17],data[16],data[15],qp,t1,t2,v1,v2,v3);
          if (type)
 	    {
     	     if (type==0) sprintf (date,"%04d%02d%02d%02d%02d00",currenttime->tm_year+1900,currenttime->tm_mon+1,currenttime->tm_mday,currenttime->tm_hour,currenttime->tm_min);
@@ -276,25 +282,25 @@ int DeviceKarat::ReadData (UINT	type, UINT deep)
     		     //if (data[1]<7 || data[1]>0) { deep--; continue; }
     		     //if (data[0]>12) continue;
 		    }
-	     //if (type==1 && (data[1]>20)) {deep--; continue; }
-	    /*
-             StoreData (dbase,this->device, 13, 0, type, 0, q1, date, 1);
-             StoreData (dbase,this->device, 13, 1, type, 0, q2, date, 1);
-             StoreData (dbase,this->device, 13, 2, type, 0, qp, date, 1);
-             StoreData (dbase,this->device, 11, 0, type, 0, v1, date, 1);
-             StoreData (dbase,this->device, 11, 1, type, 0, v2, date, 1);
-	     StoreData (dbase,this->device, 4,  0, type, 0, t1, date, 1);
-             StoreData (dbase,this->device, 4,  1, type, 0, t2, date, 1);
-    	     StoreData (dbase,this->device, 16, 0, type, 0, p1, date, 1);
-    	     StoreData (dbase,this->device, 16, 1, type, 0, p2, date, 1);
-*/
+	     //if (type==1 && (data[1]>20)) {deep--; continue; }	    
+             //StoreData (dbase,this->device, 13, 0, type, 0, q1, date, 0);
+             //StoreData (dbase,this->device, 13, 1, type, 0, q2, date, 0);
+             StoreData (dbase,this->device, 13, 2, type, 0, qp, date, 0);
+             StoreData (dbase,this->device, 11, 0, type, 0, v1, date, 0);
+             StoreData (dbase,this->device, 11, 1, type, 0, v2, date, 0);
+             StoreData (dbase,this->device, 11, 5, type, 0, v3, date, 0);
+	     StoreData (dbase,this->device, 4,  0, type, 0, t1, date, 0);
+             StoreData (dbase,this->device, 4,  1, type, 0, t2, date, 0);
+    	     StoreData (dbase,this->device, 16, 0, type, 0, p1, date, 0);
+    	     StoreData (dbase,this->device, 16, 1, type, 0, p2, date, 0);
 	    }
          else
 	    {
                  StoreData (dbase,this->device, 11, 0, 0, v1, 0);
     		 StoreData (dbase,this->device, 11, 1, 0, v2, 0);
-    	         StoreData (dbase,this->device, 13, 0, 0, q1, 0);
-        	 StoreData (dbase,this->device, 13, 1, 0, q2, 0);
+    		 StoreData (dbase,this->device, 11, 5, 0, v3, 0);
+    	         //StoreData (dbase,this->device, 13, 0, 0, q1, 0);
+        	 //StoreData (dbase,this->device, 13, 1, 0, q2, 0);
 	         StoreData (dbase,this->device, 4, 0, 0, t1, 0);
     		 StoreData (dbase,this->device, 4, 1, 0, t2, 0);
 	         StoreData (dbase,this->device, 16, 0, 0, p1, 0);
@@ -316,9 +322,9 @@ int DeviceKarat::ReadData (UINT	type, UINT deep)
 BOOL OpenCom (SHORT blok, UINT speed)
 {
  CHAR devp[50];
- sprintf (devp,"/dev/ttyS%d",blok);
- sprintf (devp,"/dev/ttyS0",blok);
+ sprintf (devp,"/dev/ttyS2");
 // sprintf (devp,"/dev/ttyUSB0",blok);
+// sprintf (devp,"/dev/ttyUSB0");
  modbus_init_rtu(&mb_param, devp, speed, "none", 8, 1);
  modbus_set_debug(&mb_param, FALSE);
  if (modbus_connect(&mb_param) == -1) 

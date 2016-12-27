@@ -26,6 +26,8 @@
 #include "ce102.h"
 #include "ce303.h"
 #include "tecon_19.h"
+#include "karat.h"
+#include "modbus_slave.h"
 //#include "hart.h"
 //#include "tecon_19_gsm.h"
 
@@ -176,7 +178,6 @@ void * dispatcher (void * thread_arg)
  float	ct=0;
  int who = RUSAGE_SELF; 
  struct rusage usage; 
-
  tim=time(&tim);
  currenttime=localtime(&tim); // get current system time
  WorkRegim=TRUE;
@@ -188,12 +189,12 @@ void * dispatcher (void * thread_arg)
  DWORD	secc=3600*172;
  CHAR	dat[20]={0};
  dbase.sqlconn("dk","root","");			// connect to database
- sprintf (querys,"set character_set_client='koi8r'"); dbase.sqlexec(querys); 
- sprintf (querys,"set character_set_results='koi8r'"); dbase.sqlexec(querys);
- sprintf (querys,"set collation_connection='koi8r_general_ci'"); dbase.sqlexec(querys);
+ sprintf (querys,"set character_set_client='utf8'"); dbase.sqlexec(querys); 
+ sprintf (querys,"set character_set_results='utf8'"); dbase.sqlexec(querys);
+ sprintf (querys,"set collation_connection='utf8_general_ci'"); dbase.sqlexec(querys);
 
  sleep (10);
- 
+
  while (secc--)
     {
      tim=time(&tim);
@@ -206,6 +207,7 @@ void * dispatcher (void * thread_arg)
      //glibtop_get_cpu (&cpu1);
      //sleep (1);
      //glibtop_get_cpu (&cpu2);
+
      //ct=100*(((unsigned long)cpu2.user-(unsigned long)cpu1.user)+((unsigned long)cpu2.nice-(unsigned long)cpu1.nice)+((unsigned long)cpu2.sys-(unsigned long)cpu1.sys));
      //ct/=((unsigned long)cpu2.total-(unsigned long)cpu1.total);
      getrusage(who,&usage);
@@ -235,6 +237,11 @@ void StartThreads (void)
  if (debug>3) ULOGW ("create all device thread");
  // start all device type thread
  //ULOGW ("[kernel] pthread [km5-%d] [lk-%d] [irp-%d] [tek-%d] [ce-%d] | thread  [km5-%d] [lk-%d] [irp-%d] [tek-%d] [ce-%d]",dk.pth_km5,dk.pth_lk,dk.pth_irp,dk.pth_tek,dk.pth_ce,km5_thread,lk_thread,irp_thread,tek_thread,ce_thread);
+
+ if (!modbus_slave_thread)
+ if(pthread_create(&thr,NULL,msServerThread,NULL) != 0) 
+    ULOGW ("%serror create modbus server thread%s",kernel_color,nc);
+ else { if (thr) pthread_detach (thr); modbus_slave_thread=TRUE; thrdnum++; }
 
  if (dk.pth[TYPE_INPUTKM] && !km5_thread)
  if(pthread_create(&thr,NULL,kmDeviceThread,(void *)&thrdnum) != 0)
@@ -290,6 +297,11 @@ void StartThreads (void)
  if(pthread_create(&thr,NULL,tsrvDeviceThread,(void *)&dk.device) != 0)
     ULOGW ("%serror create TSRV thread%s",kernel_color,nc);
  else { if (thr) pthread_detach (thr); threads[TYPE_INPUTTSRV]=TRUE; thrdnum++; }
+
+ if (dk.pth[TYPE_KARAT] && !threads[TYPE_KARAT])
+ if(pthread_create(&thr,NULL,karatDeviceThread,(void *)&dk.device) != 0)
+    ULOGW ("%serror create Karat thread%s",kernel_color,nc);
+ else { if (thr) pthread_detach (thr); threads[TYPE_KARAT]=TRUE; thrdnum++; }
 
 // if (dk.formxml && !srv_thread)
 // if(pthread_create(&thr,NULL,serviceThread,(void *)&thrdnum) != 0)
