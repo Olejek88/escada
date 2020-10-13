@@ -1,0 +1,34 @@
+.bcHeatmapTable{
+	font-family: Verdana, Arial, Helvetica, sans-serif;
+	margin: 0px;
+	background-color: #000000;
+	border-spacing: 1px;
+	border-collapse: separate;
+}
+
+.bcHeatmapTDoff{
+	padding: 1px;
+}
+
+.bcHeatmapTDon{
+	cursor: pointer;
+	padding: 1px;
+}
+
+.bcHeatmapSymbol{
+	font-size: 12px;
+}
+
+.bcHeatmapChange{
+	font-size: 12px;
+	font-weight: bold;
+}
+
+.tooltip {
+	border: 1px solid #999999;
+	padding: 1px;
+	margin: 1px;
+	font-size: 8pt;
+	background-color: #FFFFCC;
+	font-family: arial;
+}

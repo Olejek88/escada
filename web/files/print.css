@@ -1,0 +1,90 @@
+/* general stuff */
+body {
+	background: white;
+	margin: 0;
+	padding: 0;
+	font-family:"Times New Roman", Times, serif;
+	margin: 0;
+}
+.logoarea {
+	height: 50px;
+}
+
+.maincol {
+	border: 0;
+	width: 100%;
+	margin:0;
+	color: black;
+	padding: 0;
+	background-color:#FFFFFF;
+	overflow:visible;
+	background: transparent;
+	margin-top: -40px;
+	float: none !important;
+}
+.whitebox {
+	width: 100%;
+	margin:0;
+	float: none !important;
+}
+a {
+	text-decoration:underline;
+	background: transparent;
+	color: #5182AD;
+}
+a:link, a:visited {
+	color: #5182AD;
+	background: transparent;
+	text-decoration: underline;
+	}
+
+/* remove items from print */
+.topbar, .menu, .submenu, .homesubmenu, .sidemenu, .sponsors, .marketplace, .ad728, .ad300x250,
+.footer, .crumbs, .flipcharts, .pages, .dropdownbutton, .chartsettings, #mycharts_img, .tag,
+#header_bar, #footer, #dmgfooter {
+	display:none;	
+}
+.logo {
+	margin-top:-10px;
+}		
+.bar {
+	border: 1px solid #CCCCCC;
+}
+
+.noprint {
+	display:none;
+}
+.bcHeatmapTDon {
+	border: 1px solid #333333;
+}
+.xscroll {
+	display:inline;
+}
+
+/* cheat sheet colors*/
+.flash_up {
+	color:#009900;
+}
+.flash_dn {
+	color:#FF0000;
+}
+.flash_nc {
+	color:#000000;
+}
+
+/* Opinion colors*/
+.sig_sell {
+	color: #FF0000;
+	font-weight: bold;
+	vertical-align:middle;
+}
+.sig_buy {
+	color:#009900;
+	font-weight: bold;
+	vertical-align:middle;
+}
+.sig_hold {
+	color:#660099;
+	font-weight: bold;
+	vertical-align:middle;
+}
